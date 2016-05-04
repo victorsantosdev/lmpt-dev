@@ -17,6 +17,9 @@
 #include <SPI.h> //necessário para o ADS1248
 #include <math.h>
 
+#define DEBUG
+#undef DEBUG 
+
 /*********** definições de constantes do programa *******************/
 #define SERIAL_BAUDRATE 9600
 #define SERIAL_PACKET_SIZE 64 //64 bits o protocolo de comunicação com o PC
@@ -59,10 +62,10 @@ LiquidCrystal_I2C lcd(0x3F,20,4);
 /* Declaração de variáveis e pinos usados */
 const uint8_t LED_PID = 46;
 const uint8_t LED_STATUS = 13; //led da própria placa
-const uint8_t ADS_SLAVE_SELECT = 52;
-const uint8_t CONTROLE_POT = A0;
-const uint8_t TERM_SUP = A1;
-const uint8_t TERM_INF = A2;
+const uint8_t ADS_SLAVE_SELECT = 47;
+const uint8_t CONTROLE_POT = A4;
+const uint8_t TERM_SUP = A0;
+const uint8_t TERM_INF = A1;
 const uint8_t PID_PWM = 12;
 const float TETO_ESCALA_DELTA_T = 30.0;
 
@@ -140,10 +143,12 @@ void loop() {
     tempo_ms = millis();
 
     deltaT_adc = analogRead(CONTROLE_POT);
-    deltaT_usuario = 30.0 - ((deltaT_adc*TETO_ESCALA_DELTA_T)/4095.0);
+    deltaT_usuario = ((deltaT_adc*TETO_ESCALA_DELTA_T)/4095.0);
+    #ifdef DEBUG
     Serial.print("deltaT_usuario:");
     Serial.print(deltaT_usuario);
     Serial.println("");
+    #endif
     //Calcula a media de leituras do ADC antes de converter em graus Celsius
     media_tsup = calculaMedia(TERM_SUP, AMOSTRAS_MEDIA);
     temp_tsup = steinhartAndHart(media_tsup, RESISTENCIA_TERMISTOR_1, RESISTENCIA_PAD_T1);
@@ -233,8 +238,8 @@ void templateLCD_conveccao() {
 
 void escreveTensao_lcd(float tensao, uint8_t linha_display) {
     lcd.setCursor(8, linha_display); 
-    if (tensao > 10000 || tensao < 0) tensao = 0;
-    lcdPrintFloat(tensao, 2);
+    //if (tensao > 10000 || tensao < 0) tensao = 0;
+    lcdPrintFloat(tensao, 1);
 }
 
 void escreveTemp_lcd(double temperatura, uint8_t linha_display) {
@@ -452,9 +457,11 @@ int controle_pid(double setpoint, double input) {
     erro = setpoint - input;
     if (erro < 1 && erro > -1) digitalWrite(LED_PID, HIGH);
     else digitalWrite(LED_PID, !digitalRead(LED_PID));
+    #ifdef DEBUG
     Serial.print("erro:");
     Serial.print(erro);
     Serial.println("");
+    #endif
     p_term = kp*erro;
     i_term += (ki*erro);
     if(i_term > PID_MAX) i_term=PID_MAX;
@@ -462,14 +469,18 @@ int controle_pid(double setpoint, double input) {
     d_term = kd*(input-last_input);
     pid = p_term + i_term - d_term;
     pid = 4095 - pid;
+    #ifdef DEBUG
     Serial.print("pid_tmp:");
     Serial.print(pid);
     Serial.println("");
+    #endif
     if(pid > PID_MAX) pid=PID_MAX;
     if(pid < PID_MIN) pid=PID_MIN; 
+    #ifdef DEBUG
     Serial.print("pid:");
     Serial.print(pid);
     Serial.println("");
+    #endif
     erro_old = erro;
     last_input = input;
     pid_value = pid;
