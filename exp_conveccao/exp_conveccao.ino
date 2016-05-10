@@ -56,6 +56,10 @@
 #define SENSOR_TERMOPAR 2
 #define SENSOR_ADS 3
 
+//costantes definidas por Saulo Guths
+#define C_SUP 0.288
+#define C_INF 0.259
+
 //pinos utilizados (interface I2C): 20 (SDA), 21(SCL) 
 LiquidCrystal_I2C lcd(0x27,20,4);
 
@@ -88,7 +92,7 @@ double ads1248_ganhoCanal[4]; //vetor de configuração de ganho por canal
 double ads1248_ad[4]; //4 canais com 8 entradas diferenciais
 double media_tPlaca = 0, media_tAr = 0;
 double temp_tPlaca = 0, temp_tAr = 0;
-double q1=0, q2=0;
+double q_sup=0, q_inf=0;
 
 //pid
 int pid_out = 0;
@@ -174,20 +178,20 @@ void loop() {
         ads1248_cadencia_ms = tempo_ms;
     }
 
-    q1 = ads1248_ad[2];
-    q2 = ads1248_ad[3];
+    q_sup = C_SUP * ads1248_ad[2];
+    q_inf = C_INF * ads1248_ad[3];
 
     if ((tempo_ms - lcd_serial_cadencia_ms) >= LCD_SERIAL_CADENCIA) {
         //LCD
         //Converte em graus Celsius utilizando a função de SteinHart-Hart e escreve no LCD
         escreveTemp_lcd(temp_tPlaca, 2);
         escreveTemp_lcd(temp_tAr, 3);
-        escreveTensao_lcd(q1, 0);
-        escreveTensao_lcd(q2, 1);
+        escreveTensao_lcd(q_sup, 0);
+        escreveTensao_lcd(q_inf, 1);
         enviaSerial(SENSOR_TERMISTOR, 0,temp_tPlaca);
         enviaSerial(SENSOR_TERMISTOR, 1,temp_tAr);
-        enviaSerial(SENSOR_ADS, 0, q1);
-        enviaSerial(SENSOR_ADS, 1, q2);
+        enviaSerial(SENSOR_ADS, 0, q_sup);
+        enviaSerial(SENSOR_ADS, 1, q_inf);
         lcd_serial_cadencia_ms = tempo_ms;
     }
 }
