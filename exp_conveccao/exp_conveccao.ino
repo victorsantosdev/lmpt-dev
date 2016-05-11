@@ -99,6 +99,13 @@ int pid_out = 0;
 double erro = 0, deltaT_placas = 0;
 double deltaT_usuario = 0, deltaT_adc=0;
 
+const double a =56.83785716;
+const double b =-446.8507411;
+const double c=1372.40215;  
+const double d=-2053.311767;  
+const double e=1525.70188;  
+const double f=-449.8281345;
+
 void setup() {   
   
     //Serial que se comunica com o software no PC
@@ -153,9 +160,15 @@ void loop() {
     //Calcula a media de leituras do ADC antes de converter em graus Celsius
     media_tPlaca = calculaMedia(TERM_PLACA, AMOSTRAS_MEDIA);
     media_tAr = calculaMedia(TERM_AR, AMOSTRAS_MEDIA);
+    
+    media_tPlaca = (media_tPlaca * 3.3)/4095.0; //passa para V em double para usar a função de calibração
+    temp_tPlaca = calibrar_tensao(media_tPlaca);
 
-    temp_tPlaca = steinhartAndHart(media_tPlaca, RESISTENCIA_TERMISTOR_1, RESISTENCIA_PAD_T1);
-    temp_tAr = steinhartAndHart(media_tAr, RESISTENCIA_TERMISTOR_2, RESISTENCIA_PAD_T2);     
+    media_tAr = (media_tAr * 3.3)/4095.0; //passa para V em double para usar a função de calibração
+    temp_tAr = calibrar_tensao(media_tAr);
+    
+    //temp_tPlaca = steinhartAndHart(media_tPlaca, RESISTENCIA_TERMISTOR_1, RESISTENCIA_PAD_T1);
+    //temp_tAr = steinhartAndHart(media_tAr, RESISTENCIA_TERMISTOR_2, RESISTENCIA_PAD_T2);     
     deltaT_adc = analogRead(CONTROLE_POT);
     deltaT_usuario = ((deltaT_adc*TETO_ESCALA_DELTA_T)/4095.0);
     
@@ -508,4 +521,17 @@ double steinhartAndHart(double mediaLeituras, double resistenciaTermisor, double
     double temperatura = 1.0 / (A + (B * LnRes) + (C * pow(LnRes, 3.0)));
     temperatura = temperatura - 273.15; //converte de graus Kelvin para graus Celsius
     return temperatura;
+}
+
+//função escrita pelo Saulo com as constantes de calibração do termistor de 10k (levantada por aproximacao no Excel)
+//a função recebe um valor double de tensão e retorna a respectiva temperatura em Celsius referente a esta tensão
+double calibrar_tensao(double tensao_para_calibrar) {
+  double retorno_calibracao;
+  retorno_calibracao = a*pow(tensao_para_calibrar, 5) +
+                       b*pow(tensao_para_calibrar, 4) +
+                       c*pow(tensao_para_calibrar, 3) +
+                       d*pow(tensao_para_calibrar, 2) +
+                       e*pow(tensao_para_calibrar, 1) +
+                       f*pow(tensao_para_calibrar, 0);
+  return retorno_calibracao; 
 }
