@@ -100,6 +100,10 @@ const double d=-2053.311767;
 const double e=1525.70188;  
 const double f=-449.8281345;
 
+//constantes definidas por Saulo Guths
+#define C_SUP 0.115
+#define C_INF 0.117
+
 void setup() {   
   
     //Serial que se comunica com o software no PC
@@ -164,7 +168,7 @@ void loop() {
 
     media_tinf = calculaMedia(TERM_INF, AMOSTRAS_MEDIA);
     media_tinf = (media_tinf * 3.3)/4095.0; //passa para V em double para usar a função de calibração
-    temp_tinf' = calibrar_tensao(media_tinf);
+    temp_tinf = calibrar_tensao(media_tinf);
     //temp_tinf = steinhartAndHart(media_tinf, RESISTENCIA_TERMISTOR_2, RESISTENCIA_PAD_T2);
 
     deltaT_termistores = temp_tsup - temp_tinf;
@@ -180,8 +184,8 @@ void loop() {
         ads1248_cadencia_ms = tempo_ms;
     }
 
-    q_sup = ads1248_ad[0];
-    q_inf = ads1248_ad[1];
+    q_sup = C_SUP * ads1248_ad[0];
+    q_inf = C_INF * ads1248_ad[1];
 
     if ((tempo_ms - lcd_serial_cadencia_ms) >= LCD_SERIAL_CADENCIA) {
         //LCD

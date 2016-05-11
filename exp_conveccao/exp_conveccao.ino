@@ -56,7 +56,7 @@
 #define SENSOR_TERMOPAR 2
 #define SENSOR_ADS 3
 
-//costantes definidas por Saulo Guths
+//constantes definidas por Saulo Guths
 #define C_SUP 0.288
 #define C_INF 0.259
 
