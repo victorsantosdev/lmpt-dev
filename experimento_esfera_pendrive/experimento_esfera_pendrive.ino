@@ -23,10 +23,11 @@
 
 /*********** definições de constantes do programa *******************/
 #define SERIAL_BAUDRATE 9600
+#define PENDRIVE_BAUDRATE 9600
 #define SERIAL_PACKET_SIZE 64 //64 bits o protocolo de comunicação com o PC
 #define RESOLUCAO_ADC 12
 #define AMOSTRAS_MEDIA 5.0 //média aritmética de 5 amostras por canal
-#define SERIAL_CADENCIA 2000
+#define SERIAL_CADENCIA 1000
 
 //definição dos valores de resistência nominal para cada termistor utilizado
 #define RESISTENCIA_TERMISTOR_1 10000.0
@@ -70,7 +71,6 @@ long long timestamp = 0; //timestamp utilizado como base de tempo na gravacao do
 char * s_sensores[4] = {"SENSOR_TERMISTOR","SENSOR_ADC","SENSOR_TERMOPAR","SENSOR_ADS"};
 char dados_pendrive[300];
 char sensor_data[30];
-int i = 0; // teste
 
 int ledState = LOW; 
 int pendriveState;
@@ -80,7 +80,6 @@ int lastPendriveState = HIGH;
 long lastDebounceTime = 0;  // the last time the output pin was toggled   
 long debounceDelay = 50;    // the debounce time; increase if the output flickers      
 int reading;
-int flag_desconectado = 1;
 
 typedef struct {
     uint8_t preamble_init;
@@ -133,7 +132,7 @@ void setup() {
   escreveTemp_lcd(0,3);
 
   //inicializacao das rotinas do pendrive
-  Serial3.begin(9600); 
+  Serial3.begin(PENDRIVE_BAUDRATE); 
   pinMode(PENDRIVE_PIN, INPUT);
 
 }
@@ -188,6 +187,7 @@ void loop() {
 
   if (pendriveState == 1) {
     digitalWrite(LED_STATUS, ledState);
+    
     if (pd_estadoAtual == desconectado) { //se o pendrive estava anteriormente desconectado, abre um novo arquivo
       //cria o arquivo no pendrive pra gravar
       flash_data("$WRITE ARDUINO.TXT");
@@ -196,11 +196,10 @@ void loop() {
       pd_estadoAtual = conectado;
       
     } 
-    if (pd_estadoAtual == append) {
-      flash_data("$APPEND ARDUINO.TXT"); 
-      delay(250);
-      pd_UltimoEstado = append;
-                  
+    if ((pd_estadoAtual == append) && (pd_UltimoEstado == fechado)) {
+        flash_data("$APPEND ARDUINO.TXT"); 
+        delay(250);
+        pd_UltimoEstado = append;
     }
     
     if (pd_estadoAtual == fechado) {
@@ -214,6 +213,7 @@ void loop() {
   } else {
       digitalWrite(LED_STATUS, ledState);
       pd_estadoAtual = desconectado;
+      timestamp = 0;
   }
 
   if ((tempo_ms - serial_cadencia_ms) >= SERIAL_CADENCIA) {
@@ -222,7 +222,7 @@ void loop() {
     enviaSerial(SENSOR_TERMISTOR, 2,temp_tAr);
     
     if (pendriveState == 1) {  
-        if(pd_estadoAtual == conectado || (pd_estadoAtual == append && pd_UltimoEstado != fechado) ) { 
+        if((pd_estadoAtual == conectado) || (pd_estadoAtual == append && pd_UltimoEstado != fechado) ) { 
           escreve_pendrive(timestamp, SENSOR_TERMISTOR, 0, temp_tNegro);
           escreve_pendrive(timestamp, SENSOR_TERMISTOR, 1, temp_tBrilho);
           escreve_pendrive(timestamp, SENSOR_TERMISTOR, 2, temp_tAr);
