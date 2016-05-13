@@ -40,6 +40,9 @@
 #define RESISTENCIA_PAD_T1 10000.0
 #define RESISTENCIA_PAD_T2 10000.0
 
+//tamanho de digitos maximo para o fluxo
+#define MAX_Q_DIGITS 7
+
 //constantes calibracao para o thermistor de 10k Ohm
 #define A 3.354016e-03                 
 #define B 3.509850e-04                 
@@ -72,6 +75,9 @@ const uint8_t TERM_PLACA = A0;
 const uint8_t TERM_AR = A1;
 const uint8_t PID_PWM = 12;
 const float TETO_ESCALA_DELTA_T = 30.0;
+
+//utilizado para printar corretamente o fluxo em int no LCD
+char lcd_q_string[MAX_Q_DIGITS];
 
 typedef struct {
     uint8_t preamble_init;
@@ -191,8 +197,8 @@ void loop() {
         ads1248_cadencia_ms = tempo_ms;
     }
 
-    q_sup = C_SUP * ads1248_ad[2];
-    q_inf = C_INF * ads1248_ad[3];
+    q_sup = /* C_SUP * */ads1248_ad[2];
+    q_inf = /* C_INF * */ads1248_ad[3];
 
     if ((tempo_ms - lcd_serial_cadencia_ms) >= LCD_SERIAL_CADENCIA) {
         //LCD
@@ -213,18 +219,15 @@ void loop() {
  *  do laboratório e do departamento.
  */
 void lcd_splash() {
-    lcd.setCursor(8, 0);
-    lcd.print("UFSC");
+    lcd.setCursor(5, 0);  
+    lcd.print("SENSU LTDA");
     delay(100);
-    lcd.setCursor(0, 1);
-    lcd.print("Dept. Eng. Mecanica");
+    lcd.setCursor(4, 2);  
+    lcd.print("Experimentos");
     delay(100);
-    lcd.setCursor(0, 2);
-    lcd.print("Laboratorio LMPT");
-    delay(100);
-    lcd.setCursor(0, 3);
-    lcd.print("Release 1.0");
-    delay(1000);
+    lcd.setCursor(5, 3);  
+    lcd.print("Didaticos");
+    delay(3000);
     lcd.clear();
 }
 
@@ -257,9 +260,17 @@ void templateLCD_conveccao() {
 }
 
 void escreveTensao_lcd(float tensao, uint8_t linha_display) {
+    int tensao_temp = 0;
     lcd.setCursor(8, linha_display); 
     //if (tensao > 10000 || tensao < 0) tensao = 0;
-    lcdPrintFloat(tensao, 1);
+    lcd.print("       "); 
+    tensao_temp = tensao;
+    snprintf(lcd_q_string, MAX_Q_DIGITS, "%d", tensao_temp); 
+    lcd.setCursor(8, linha_display);
+    lcd.print(tensao_temp);
+    delay(100);
+    memset(lcd_q_string,0,sizeof(lcd_q_string));
+        
 }
 
 void escreveTemp_lcd(double temperatura, uint8_t linha_display) {
@@ -507,21 +518,6 @@ int controle_pid(double setpoint, double input) {
     return pid_value;
   }
 
-/* int steinhartAndHart(int mediaLeituras, int resistenciaTermisor, int resistenciaPad);
- * A função retorna o valor de temperatura em graus Celsius
- * sendo necessário entrar com o valor de leitura do ADC (ou média das leituras) 
- * no qual o termistor está acoplado, o valor nominal de sua resistência em Ohms
- * e o valor de resistência utilizado no padding (resistência auxiliar)
- */
-
-double steinhartAndHart(double mediaLeituras, double resistenciaTermisor, double resistenciaPad) {
-    //calculo da temperatura é feito seguindo a função de SteinHart-Hart para termistores
-    double resistencia = resistenciaPad * ((4095.0 / mediaLeituras) - 1.0);
-    double LnRes = log(resistencia / resistenciaTermisor);
-    double temperatura = 1.0 / (A + (B * LnRes) + (C * pow(LnRes, 3.0)));
-    temperatura = temperatura - 273.15; //converte de graus Kelvin para graus Celsius
-    return temperatura;
-}
 
 //função escrita pelo Saulo com as constantes de calibração do termistor de 10k (levantada por aproximacao no Excel)
 //a função recebe um valor double de tensão e retorna a respectiva temperatura em Celsius referente a esta tensão

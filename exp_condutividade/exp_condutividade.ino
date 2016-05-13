@@ -40,6 +40,9 @@
 #define RESISTENCIA_PAD_T1 10000.0
 #define RESISTENCIA_PAD_T2 10000.0
 
+//tamanho de digitos maximo para o fluxo
+#define MAX_Q_DIGITS 7
+
 //constantes calibracao para o thermistor de 10k Ohm
 #define A 3.354016e-03                 
 #define B 3.509850e-04                 
@@ -99,6 +102,9 @@ const double c=1372.40215;
 const double d=-2053.311767;  
 const double e=1525.70188;  
 const double f=-449.8281345;
+
+//utilizado para printar corretamente o fluxo em int no LCD
+char lcd_q_string[MAX_Q_DIGITS];
 
 //constantes definidas por Saulo Guths
 #define C_SUP 0.115
@@ -204,18 +210,15 @@ void loop() {
  *  do laboratório e do departamento.
  */
 void lcd_splash() {
-    lcd.setCursor(8, 0);
-    lcd.print("UFSC");
+    lcd.setCursor(5, 0);  
+    lcd.print("SENSU LTDA");
     delay(100);
-    lcd.setCursor(0, 1);
-    lcd.print("Dept. Eng. Mecanica");
+    lcd.setCursor(4, 2);  
+    lcd.print("Experimentos");
     delay(100);
-    lcd.setCursor(0, 2);
-    lcd.print("Laboratorio LMPT");
-    delay(100);
-    lcd.setCursor(0, 3);
-    lcd.print("Release 1.0");
-    delay(1000);
+    lcd.setCursor(5, 3);  
+    lcd.print("Didaticos");
+    delay(3000);
     lcd.clear();
 }
 
@@ -252,9 +255,16 @@ void templateLCD_conveccao() {
 }
 
 void escreveTensao_lcd(float tensao, uint8_t linha_display) {
+    int tensao_temp = 0;
     lcd.setCursor(8, linha_display); 
     //if (tensao > 10000 || tensao < 0) tensao = 0;
-    lcdPrintFloat(tensao, 1);
+    lcd.print("       "); 
+    tensao_temp = tensao;
+    snprintf(lcd_q_string, MAX_Q_DIGITS, "%d", tensao_temp); 
+    lcd.setCursor(8, linha_display);
+    lcd.print(tensao_temp);
+    delay(100);
+    memset(lcd_q_string,0,sizeof(lcd_q_string));
 }
 
 void escreveTemp_lcd(double temperatura, uint8_t linha_display) {

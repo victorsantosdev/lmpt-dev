@@ -68,6 +68,7 @@ typedef struct {
   } packet;
 
 void setup() {
+  
   //Configuração dos pinos do ADC
   pinMode(TERMISTOR_TNEGRO, INPUT);
   pinMode(TERMISTOR_TBRILHO, INPUT);
@@ -125,18 +126,18 @@ void loop() {
  *  do laboratório e do departamento.
  */
 void lcd_splash(){
-  lcd.setCursor(8, 0);  
-  lcd.print("UFSC");
+  lcd.setCursor(5, 0);  
+  lcd.print("SENSU LTDA");
   delay(100);
-  lcd.setCursor(0, 1);  
-  lcd.print("Dept. Eng. Mecanica");
+  lcd.setCursor(4, 2);  
+  lcd.print("Experimentos");
   delay(100);
-  lcd.setCursor(0, 2);  
-  lcd.print("Laboratorio LMPT");
-  delay(100);
-  lcd.setCursor(0, 3);  
-  lcd.print("Release 1.0");
-  delay(5000);
+  lcd.setCursor(5, 3);  
+  lcd.print("Didaticos");
+  //delay(100);
+  //lcd.setCursor(5, 3);  
+  //lcd.print("Transitorio");
+  delay(3000);
   lcd.clear();
   }
 
