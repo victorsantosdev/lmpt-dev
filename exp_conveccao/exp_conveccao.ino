@@ -197,8 +197,8 @@ void loop() {
         ads1248_cadencia_ms = tempo_ms;
     }
 
-    q_sup = /* C_SUP * */ads1248_ad[2];
-    q_inf = /* C_INF * */ads1248_ad[3];
+    q_sup =  C_SUP * ads1248_ad[2];
+    q_inf =  C_INF * ads1248_ad[3];
 
     if ((tempo_ms - lcd_serial_cadencia_ms) >= LCD_SERIAL_CADENCIA) {
         //LCD
