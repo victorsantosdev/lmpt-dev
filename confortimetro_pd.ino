@@ -37,15 +37,6 @@
 #define LED_STATUS 24 //led para o usuário ver quando o pendrive está gravando ou não
 //eu que uso, não é necessário
 
-//constantes calibracao para os termistores Tar, Tglobo e o Var
-//esses dados foram disponibilizados pelo Saulo, vieram de uma curva de calibração
-const double a = 56.83785716;
-const double b = -446.8507411;
-const double c = 1372.40215;
-const double d = -2053.311767;
-const double e = 1525.70188;
-const double f = -449.8281345;
-
 /* Declaração de variáveis e pinos usados */
 //pinos utilizados (interface I2C): 20 (SDA), 21(SCL)
 LiquidCrystal_I2C lcd_primeiro(0x27,20,4);//declara que existe um lcd com endereço 0x27, e que ele tem 16 colunas e 2 linhas
@@ -58,9 +49,12 @@ DS3231 rtc( SDA, SCL);
 Time t;
 
 //Variáveis auxiliares
+float tAr_filtrado = 0, tGlobo_filtrado = 0, vAr_filtrado = 0, UR_filtrado = 0;
 float media_tAr = 0, media_tGlobo = 0, media_vAr = 0, media_UR = 0;
 float tAr = 0, tGlobo = 0, vAr = 0, UR = 0;
+int contagem_amostras = 0;
 float PMV = 0, PPD = 0, metabolismo = 50, indice_de_vestimenta = 0.1;
+
 int contador_conectado = 0;
 //variáveis utilizadas no intervalo de print da serial e no date/time
 long long tempo_ms = 0;
@@ -103,6 +97,8 @@ void cabecalho_pendrive();
 void lcdPrintFloat(float val, byte precision, uint8_t numero_display);
 float calculaMedia(float entrada, float n_amostras);
 int debounce(int pin);
+float calibrar_termistores(float temperatura_em_volts);
+float calibrar_umidade(float umidade_em_volts);
 
 void setup() {
 
@@ -160,25 +156,31 @@ void loop() {
   tempo_ms = millis();
 
 #if 0
-  //Calcula a media de leituras do ADC antes de converter em graus Celsius
-  media_tAr = calculaMedia(SENSOR_TAR, AMOSTRAS_MEDIA);
-  media_tGlobo = calculaMedia(SENSOR_TGLOBO, AMOSTRAS_MEDIA);
-  media_vAr = calculaMedia(SENSOR_VEL_AR, AMOSTRAS_MEDIA);
-  media_UR = calculaMedia(SENSOR_UR, AMOSTRAS_MEDIA);
+  //calcula uma média de 10 amostras, serve como filtro de ruído digital
+  tAr_filtrado = calculaMedia(SENSOR_TAR, AMOSTRAS_MEDIA);
+  tGlobo_filtrado = calculaMedia(SENSOR_TGLOBO, AMOSTRAS_MEDIA);
+  vAr_filtrado = calculaMedia(SENSOR_VEL_AR, AMOSTRAS_MEDIA);
+  UR_filtrado = calculaMedia(SENSOR_UR, AMOSTRAS_MEDIA);
 
-  //Faço a conversão dos dados lidos no conversor analógico digital para tensão
-  media_tAr = (media_tAr * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
-  media_tGlobo = (media_tGlobo * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
-  media_vAr = (media_vAr * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
-  media_UR = (media_UR * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
+  //faz a conversão dos valores filtrados para nivel de tensão 0-3V3
+  tAr_filtrado = (tAr_filtrado * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
+  tGlobo_filtrado = (tGlobo_filtrado * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
+  vAr_filtrado = (vAr_filtrado * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
+  UR_filtrado = (UR_filtrado * 3.3) / 4095.0;//passa para V em double para usar na função de calibração
 #endif
 
   //a função calibrar_tensao recebe como parâmetro uma tensão, por isso o passo anterior é necessário
-  tAr = calibrar_tensao(media_tAr);
-  tGlobo = calibrar_tensao(media_tGlobo);
-  vAr = calibrar_tensao(media_vAr);
-  UR = calibrar_tensao(media_UR);
+  tAr = calibrar_termistores(tAr_filtrado);
+  tGlobo = calibrar_termistores(tGlobo_filtrado);
+  vAr = calibrar_termistores(vAr_filtrado);
+  UR = calibrar_umidade(UR_filtrado);
 
+  media_tAr += tAr;
+  media_tGlobo += tGlobo;
+  media_vAr += vAr;
+  media_UR += UR;
+  contagem_amostras++; 
+  
   //variaveis de teste coletadas do programa que o Saulo forneceu
   tAr = 25.1;
   tGlobo = 30.3;
@@ -186,12 +188,8 @@ void loop() {
   vAr = 1.2;
   PMV = 1.22;
   PPD = 99.8;
-  //esses dois eu que coloquei, só pra testar
-  //metabolismo = 1;
-  //indice_de_vestimenta = 2;
 
   if (digitalRead(BTN_UP_METAB) == HIGH) {
-    
     metabolismo += 2;
     if (metabolismo > 300) metabolismo = 300;
   }
@@ -199,18 +197,18 @@ void loop() {
     metabolismo -= 2;
     if (metabolismo < 50) metabolismo = 50;
   }
-    if (debounce(BTN_UP_IVEST) == HIGH) {
+    if (digitalRead(BTN_UP_IVEST) == HIGH) {
     indice_de_vestimenta += 0.1;
     if (indice_de_vestimenta > 2.0) indice_de_vestimenta = 2.0;
   }
-  if (debounce(BTN_DOWN_IVEST)) {
+  if (digitalRead(BTN_DOWN_IVEST)) {
     indice_de_vestimenta -= 0.1;
     if (indice_de_vestimenta < 0.1) indice_de_vestimenta = 0.1;
   }
   if (digitalRead(CHAVE_GRAVACAO_1MIN)== HIGH) intervalo_gravacao = UM_MINUTO;
   if (digitalRead(CHAVE_GRAVACAO_10MIN)== HIGH) intervalo_gravacao = DEZ_MINUTOS;
   if (digitalRead(CHAVE_GRAVACAO_60MIN) == HIGH) intervalo_gravacao = UMA_HORA;
-  //intervalo_gravacao = 1000;
+
   Calcula_PMV(tAr, tGlobo, vAr, UR, metabolismo, indice_de_vestimenta,  &PMV, &PPD);
 
   //Converte em graus Celsius utilizando a função de SteinHart-Hart e escreve no LCD
@@ -226,7 +224,7 @@ void loop() {
       contador_conectado = 1;
       Read_Clock();
       memset(arquivo_write, 0, sizeof(arquivo_write)); //limpa o nome do arquivo
-      memset(arquivo_append, 0, sizeof(arquivo_append)); //limpa o nome do arquivo
+      memset(arquivo_append, 0, sizeof(arquivo_append)); 
       memset(tmp, 0, sizeof(tmp));
       strcpy(arquivo_write, "$WRITE "); //nome do arquivo máximo suporta 8 letras
       strcpy(arquivo_append, "$APPEND ");
@@ -243,10 +241,6 @@ void loop() {
         snprintf(tmp, sizeof(tmp), "%d", mes);
       strcat(arquivo_write, tmp);
       strcat(arquivo_append, tmp);
-      //memset(tmp, 0, sizeof(tmp));
-      //snprintf(tmp, sizeof(tmp), "%d", ano-2000);
-      //strcat(arquivo_write, tmp);
-      //strcat(arquivo_append, tmp);
       memset(tmp, 0, sizeof(tmp));
       if (hora < 10)
         snprintf(tmp, sizeof(tmp), "0%d", hora);
@@ -306,9 +300,18 @@ void loop() {
           cabecalho_pendrive();
           pendrive_primeira_vez = 1;
         }
-        Read_Clock();
-        escreve_pendrive(rtc.getDateStr(), rtc.getTimeStr(), tAr, tGlobo, vAr, UR, metabolismo, indice_de_vestimenta, PMV, PPD);
+        //calcula as médias para gravar no pendrive e gerar o calculo do PMV médio
+        tAr = media_tAr/contagem_amostras;
+        tGlobo = media_tGlobo/contagem_amostras;
+        vAr = media_vAr/contagem_amostras;
+        UR = media_UR/contagem_amostras;
+        Calcula_PMV(tAr, tGlobo, vAr, UR, metabolismo, indice_de_vestimenta,  &PMV, &PPD);
 
+        Read_Clock();
+        //escreve a média dos valores e a média do PMV/PPD
+        escreve_pendrive(rtc.getDateStr(), rtc.getTimeStr(), tAr, tGlobo, vAr, UR, metabolismo, indice_de_vestimenta, PMV, PPD);
+        contagem_amostras = 0, media_tAr = 0, media_tGlobo = 0, media_vAr = 0, media_UR = 0;
+          
         pd_estadoAtual = fechado;
       }
     }
@@ -520,10 +523,31 @@ void escreve_pendrive(char * data, char* tempo, float tempAr, float tempGlobo, f
 
 //função escrita pelo Saulo com as constantes de calibração dos termistores de 10k (levantada por aproximacao no Excel)
 //a função recebe um valor double de tensão e retorna a respectiva temperatura em Celsius referente a esta tensão
-float calibrar_tensao(float tensao_para_calibrar) {
+float calibrar_termistores(float temperatura_em_volts) {
+//constantes calibracao para os termistores Tar, Tglobo e o Var
+//esses dados foram disponibilizados pelo Saulo, vieram de uma curva de calibração
+const double a = 2.337752299;
+const double b = -10.7972788718875;
+const double c = 17.5329682071063;
+const double d = 20.3911275138112;
+const double e = -25.2405251989491;
+
   float retorno_calibracao;
-  retorno_calibracao = a * pow(tensao_para_calibrar, 5) + b * pow(tensao_para_calibrar, 4) + c * pow(tensao_para_calibrar, 3)
-      + d * pow(tensao_para_calibrar, 2) + e * pow(tensao_para_calibrar, 1) + f * pow(tensao_para_calibrar, 0);
+  retorno_calibracao = a * pow(temperatura_em_volts, 4) + b * pow(temperatura_em_volts, 3) + c * pow(temperatura_em_volts, 2)
+      + d * pow(temperatura_em_volts, 1) + e * pow(temperatura_em_volts, 0);
+  return retorno_calibracao;
+}
+
+//função escrita pelo Saulo com as constantes de calibração do sensor de umidade
+//a função recebe um valor double de tensão e retorna a respectiva temperatura em Celsius referente a esta tensão
+float calibrar_umidade(float temperatura_em_volts) {
+//constantes calibracao para o sensor de umidade Honeywell HIH-5030
+//esses dados foram disponibilizados pelo Saulo, vieram de uma curva de calibração
+const double f = 47.64627406;
+const double g = -23.82075472;
+
+  float retorno_calibracao;
+  retorno_calibracao = f * pow(temperatura_em_volts, 1) + g * pow(temperatura_em_volts, 0);
   return retorno_calibracao;
 }
 
@@ -559,7 +583,7 @@ void str_replace(char *s, char chr, char repl_chr) {
     // will quickly become a bigger number than can be stored in an int.
     static long lastDebounceTime = 0;  // the last time the output pin was toggled
     
-    long debounceDelay = 50;    // the debounce time; increase if the output flickers      
+    long debounceDelay = 30;    // the debounce time; increase if the output flickers      
     int reading;
     
     // read the state of the switch into a local variable:
@@ -683,4 +707,3 @@ void Calcula_PMV(float Tar, float TGlobo, float VelocAr, float UR, float metab, 
   *PPD = 100.0 - 95.0 * exp(-(0.03353 * pow(*PMV, 4) + 0.2179 * pow(*PMV, 2)));
 }
 #endif
-
