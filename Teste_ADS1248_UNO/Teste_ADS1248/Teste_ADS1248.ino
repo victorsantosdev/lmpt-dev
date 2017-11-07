@@ -196,7 +196,9 @@ bool ads1248_ajustar_canal_ganho(int MUX_SP, int MUX_SN, int PGA)
 
 double ads1248_ler(int ganho) 
 {
-  int MSB, midSB, LSB;
+  //int MSB, midSB, LSB;
+  //unsigned long int palavra;
+  long long MSB, midSB, LSB;
   unsigned long int palavra;
   double tensao_ads1248[200];
   double media_tensao_ads1248, media_tensao_ads1248_corrigida;
